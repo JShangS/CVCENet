@@ -59,33 +59,33 @@ class CVRDN(nn.Module):
         growthRate = args.growthRate
         self.args = args
         # F-1
-        self.cvconv1 = ComplexConv2d(inChannel, nFeat, kernel_size=3, padding=1, bias=True)
-        # F0
-        self.cvconv2 = ComplexConv2d(nFeat, nFeat, kernel_size=3, padding=1, bias=True)
+        self.cvconv1 = ComplexConv2d(inChannel, nFeat, kernel_size=1, padding=0, bias=True)
+        # # F0
+        # self.cvconv2 = ComplexConv2d(nFeat, nFeat, kernel_size=3, padding=1, bias=True)
         # RDBs 3 
         self.CVRDB1 = CVRDB(nFeat, nDenselayer, growthRate)
         self.CVRDB2 = CVRDB(nFeat, nDenselayer, growthRate)
         self.CVRDB3 = CVRDB(nFeat, nDenselayer, growthRate)
         # global feature fusion (GFF)
         self.GFF_1x1 = ComplexConv2d(nFeat*3, nFeat, kernel_size=1, padding=0, bias=True)
-        self.GFF_3x3 = ComplexConv2d(nFeat, nFeat, kernel_size=3, padding=1, bias=True)
+        # self.GFF_3x3 = ComplexConv2d(nFeat, nFeat, kernel_size=3, padding=1, bias=True)
         # Upsampler
         self.cvconv_up = ComplexConv2d(nFeat, nFeat*scale*scale, kernel_size=3, padding=1, bias=True)
         self.upsample = sub_pixel(scale)
         # conv 
-        self.cvconv3 = ComplexConv2d(nFeat, outChannel, kernel_size=3, padding=1, bias=True)
+        # self.cvconv3 = ComplexConv2d(nFeat, outChannel, kernel_size=3, padding=1, bias=True)
     def forward(self, x):
 
         F_  = self.cvconv1(x) # nFeat
-        F_0 = self.cvconv2(F_) # nFeat
-        F_1 = self.CVRDB1(F_0) # nFeat
+        # F_0 = self.cvconv2(F_) # nFeat
+        F_1 = complex_relu(self.CVRDB1(F_)) # nFeat
         F_2 = self.CVRDB2(F_1) # nFeat
         F_3 = self.CVRDB3(F_2) # nFeat
         FF = torch.cat((F_1, F_2, F_3), 1) # 3*nFeat
         FdLF = self.GFF_1x1(FF)# nFeat         
-        FGF = self.GFF_3x3(FdLF) # nFeat
-        FDF = FGF + F_ # nFeat
-        output = self.cvconv3(FDF) # outChannel
+        # FGF = self.GFF_3x3(FdLF) # nFeat
+        output = FdLF + F_ # nFeat
+        # output = self.cvconv3(FDF) # outChannel
         # us = self.cvconv_up(FDF)
         # us = self.upsample(us)
 
@@ -96,11 +96,11 @@ class CVRDN(nn.Module):
 class CENet(nn.Module):
     def __init__(self, args):
         super(CENet, self).__init__()
-        self.CVRDN1 = CVRDN(args, args.nDenselayer1, args.inChannel1, args.dof) #regular data feature extract layers
-        self.CVRDN2 = CVRDN(args, args.nDenselayer2, args.inChannel2, args.dof) #primary data feature extract layers
+        self.CVRDN1 = CVRDN(args, args.nDenselayer1, args.inChannel1, args.dof*2) #regular data feature extract layers
+        self.CVRDN2 = CVRDN(args, args.nDenselayer2, args.inChannel2, args.dof*2) #primary data feature extract layers
         self.CVRDN3 = CVRDN(args, args.nDenselayer3, args.inChannel3, args.dof*2) #secondary data feature extract layers
         self.CVRDN_EC = CVRDN(args, args.nDenselayer, args.dof*4, args.dof*2) #Covariance estiamtion layers
-        self.GFF1_1x1 = ComplexConv2d(args.dof*2, 2, kernel_size=1, padding=0, bias=True)
+        self.GFF1_3x3 = ComplexConv2d(args.dof*2, 2, kernel_size=3, padding=1, bias=True)
         self.GFF2_1x1 = ComplexConv2d(2,1, kernel_size=1, padding=0, bias=True)
         self.cdropout2d = ComplexDropout2d()
         self.nb1 = ComplexBatchNorm2d(args.inChannel1)
@@ -115,7 +115,7 @@ class CENet(nn.Module):
         # Road3 = self.cdropout2d(Road3)
         FF = torch.cat((Road1, Road2, Road3), 1)
         F1 = self.CVRDN_EC(FF)
-        F2 = self.GFF1_1x1(F1)
-        output = self.GFF1_1x1(F2)
+        F2 = self.GFF1_3x3(F1)
+        output = self.GFF2_1x1(F2)
         
         return output

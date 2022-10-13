@@ -57,9 +57,9 @@ class RDN(nn.Module):
         growthRate = args.growthRate
         self.args = args
         # F-1
-        self.conv1 = nn.Conv2d(inChannel, nFeat, kernel_size=3, padding=1, bias=True)
-        # F0
-        self.conv2 = nn.Conv2d(nFeat, nFeat, kernel_size=3, padding=1, bias=True)
+        self.conv1 = nn.Conv2d(inChannel, nFeat, kernel_size=1, padding=0, bias=True)
+        # # F0
+        # self.conv2 = nn.Conv2d(nFeat, nFeat, kernel_size=3, padding=1, bias=True)
         # RDBs 3 
         self.RDB1 = RDB(nFeat, nDenselayer, growthRate)
         self.RDB2 = RDB(nFeat, nDenselayer, growthRate)
@@ -74,16 +74,16 @@ class RDN(nn.Module):
         self.conv3 = nn.Conv2d(nFeat, outChannel, kernel_size=3, padding=1, bias=True)
     def forward(self, x):
 
-        F_  = self.conv1(x)
-        F_0 = self.conv2(F_)
-        F_1 = self.RDB1(F_0)
+        F_  = F.relu(self.conv1(x))
+        # F_0 = self.conv2(F_)
+        F_1 = self.RDB1(F_)
         F_2 = self.RDB2(F_1)
         F_3 = self.RDB3(F_2)     
         FF = torch.cat((F_1, F_2, F_3), 1)
         FdLF = self.GFF_1x1(FF)         
-        FGF = self.GFF_3x3(FdLF)
-        FDF = FGF + F_
-        output = self.conv3(FDF)
+        # FGF = self.GFF_3x3(FdLF)
+        output = FdLF + F_
+        # output = self.conv3(FDF)
         # us = self.cvconv_up(FDF)
         # us = self.upsample(us)
 
@@ -95,11 +95,11 @@ class RDN(nn.Module):
 class CENet(nn.Module):
     def __init__(self, args):
         super(CENet, self).__init__()
-        self.RDN1 = RDN(args, args.nDenselayer1, args.inChannel1, args.dof) #regular data feature extract layers
-        self.RDN2 = RDN(args, args.nDenselayer2, args.inChannel2, args.dof) #primary data feature extract layers
+        self.RDN1 = RDN(args, args.nDenselayer1, args.inChannel1, args.dof*2) #regular data feature extract layers
+        self.RDN2 = RDN(args, args.nDenselayer2, args.inChannel2, args.dof*2) #primary data feature extract layers
         self.RDN3 = RDN(args, args.nDenselayer3, args.inChannel3, args.dof*2) #secondary data feature extract layers
         self.RDN_EC = RDN(args, args.nDenselayer, args.dof*4, args.dof*2) #Covariance estiamtion layers
-        self.GFF1_1x1 = nn.Conv2d(args.dof*2, 2, kernel_size=1, padding=0, bias=True)
+        self.GFF1_3x3 = nn.Conv2d(args.dof*2, 2, kernel_size=3, padding=1, bias=True)
         self.GFF2_1x1 = nn.Conv2d(2,1, kernel_size=1, padding=0, bias=True)
         self.droupout2d = nn.Dropout2d()
         self.nb1 = nn.BatchNorm2d(args.inChannel1)
@@ -115,7 +115,7 @@ class CENet(nn.Module):
         # Road3 = self.droupout2d(Road3)
         FF = torch.cat((Road1, Road2, Road3), 1)
         F1 = self.RDN_EC(FF)
-        F2 = self.GFF1_1x1(F1)
-        output = self.GFF1_1x1(F2)
+        F2 = self.GFF1_3x3(F1)
+        output = self.GFF2_1x1(F2)
 
         return output      
