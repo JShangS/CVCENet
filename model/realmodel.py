@@ -100,7 +100,7 @@ class CENet(nn.Module):
         self.RDN3 = RDN(args, args.nDenselayer3, args.inChannel3, args.dof*2) #secondary data feature extract layers
         self.RDN_EC = RDN(args, args.nDenselayer, args.dof*4, args.dof*2) #Covariance estiamtion layers
         self.GFF1_3x3 = nn.Conv2d(args.dof*2, 2, kernel_size=3, padding=1, bias=True)
-        self.GFF2_1x1 = nn.Conv2d(2,1, kernel_size=1, padding=0, bias=True)
+        self.GFF2_1x1 = nn.Conv2d(2,2, kernel_size=1, padding=0, bias=True)
         self.droupout2d = nn.Dropout2d()
         self.nb1 = nn.BatchNorm2d(args.inChannel1)
         self.nb2 = nn.BatchNorm2d(args.inChannel2)
